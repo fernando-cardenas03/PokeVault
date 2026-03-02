@@ -66,6 +66,3 @@ The first load fetches ~200+ sets in parallel batches. Expect:
 - Cloud Run cold start: ~30-60 seconds (only happens after periods of inactivity)
 
 The frontend shows a progress bar while loading.
-
-## Cost: $0
-No API keys, no external paid services, generous Cloud Run free tier.
