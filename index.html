@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PokéVault — ETB & Booster Box Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #f5f2ec;
+  --surface:   #ffffff;
+  --surface2:  #f0ece4;
+  --border:    #e2ddd4;
+  --ink:       #1a1714;
+  --ink2:      #5a5550;
+  --ink3:      #9a948e;
+  --red:       #c23b22;
+  --red-light: #fdf1ee;
+  --green:     #2a6e4e;
+  --green-bg:  #edf6f1;
+  --blue:      #1e4fa8;
+  --blue-bg:   #eef2fc;
+  --shadow:    0 2px 12px rgba(26,23,20,0.08);
+  --shadow-lg: 0 8px 32px rgba(26,23,20,0.12);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 999;
+  opacity: 0.6;
+}
+.page {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+}
+@media (max-width: 860px) { .page { grid-template-columns: 1fr; } }
+
+/* Header */
+.header {
+  grid-column: 1 / -1;
+  background: var(--ink);
+  color: white;
+  padding: 0 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 3px solid var(--red);
+}
+.header-left { display: flex; align-items: baseline; gap: 0.6rem; padding: 1rem 0; }
+.wordmark { font-family: 'DM Serif Display', serif; font-size: 1.7rem; color: white; letter-spacing: -0.02em; }
+.wordmark em { font-style: italic; color: #f0c040; }
+.header-tag { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #888; padding-top: 4px; }
+.header-right { display: flex; align-items: center; gap: 1.5rem; }
+.source-badge { display: flex; align-items: center; gap: 0.4rem; font-size: 0.72rem; color: #aaa; }
+.source-dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.6); animation: pulse 2s ease infinite; }
+.source-dot.loading-dot { background: #f0c040; box-shadow: 0 0 6px rgba(240,192,64,0.6); }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+.price-tabs { display: flex; gap: 0.3rem; background: rgba(255,255,255,0.07); padding: 3px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
+.ptab { padding: 0.3rem 0.8rem; border: none; background: transparent; border-radius: 5px; font-family: 'DM Sans', sans-serif; font-size: 0.78rem; font-weight: 500; color: #888; cursor: pointer; transition: all 0.15s; }
+.ptab.active { background: rgba(255,255,255,0.12); color: white; }
+
+/* Sidebar */
+.sidebar {
+  background: var(--surface);
+  border-right: 1.5px solid var(--border);
+  padding: 1.75rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  position: sticky;
+  top: 0;
+  height: calc(100vh - 60px);
+  overflow-y: auto;
+}
+.sidebar::-webkit-scrollbar { width: 3px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border); }
+.section-label { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink3); margin-bottom: 0.5rem; }
+
+/* Loading banner */
+.loading-banner {
+  background: #fffbeb;
+  border: 1.5px solid #fcd34d;
+  border-radius: 8px;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.8rem;
+  color: #78350f;
+}
+.loading-banner .lb-title { font-weight: 700; margin-bottom: 2px; display: flex; align-items: center; gap: 0.4rem; }
+.lb-progress { margin-top: 0.4rem; }
+.lb-bar-bg { background: #fde68a; border-radius: 99px; height: 4px; margin-top: 4px; }
+.lb-bar-fill { height: 4px; border-radius: 99px; background: #d97706; transition: width 0.5s ease; }
+
+/* Data status */
+.data-status {
+  background: var(--green-bg);
+  border: 1.5px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.75rem;
+  color: var(--green);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.data-status .ds-count { font-family: 'DM Mono', monospace; font-weight: 500; }
+
+/* Search */
+.search-row { display: flex; gap: 0.5rem; }
+.search-box { position: relative; flex: 1; }
+.search-box svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--ink3); pointer-events: none; }
+#searchInput {
+  width: 100%;
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.6rem 0.6rem 36px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9rem;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+#searchInput:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(30,79,168,0.1); background: white; }
+#searchInput::placeholder { color: var(--ink3); }
+#searchInput:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-search {
+  background: var(--blue);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0 1rem;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, transform 0.1s;
+  flex-shrink: 0;
+}
+.btn-search:hover { background: #1a44a0; }
+.btn-search:active { transform: scale(0.97); }
+.btn-search:disabled { background: var(--border); color: var(--ink3); cursor: not-allowed; }
+
+/* Quick search */
+.quick-list { display: flex; flex-direction: column; gap: 2px; }
+.quick-btn {
+  background: transparent; border: none;
+  padding: 0.45rem 0.6rem; border-radius: 6px;
+  text-align: left; cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  transition: background 0.15s;
+  color: var(--ink2); font-family: 'DM Sans', sans-serif; font-size: 0.84rem; font-weight: 500;
+}
+.quick-btn:hover { background: var(--surface2); color: var(--ink); }
+.quick-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.type-pill { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; flex-shrink: 0; }
+.type-pill.etb  { background: var(--blue-bg); color: var(--blue); }
+.type-pill.box  { background: var(--red-light); color: var(--red); }
+.type-pill.both { background: var(--green-bg); color: var(--green); }
+
+/* Results */
+#searchResults { display: flex; flex-direction: column; gap: 0.4rem; }
+.result-card { border: 1.5px solid var(--border); border-radius: 8px; padding: 0.7rem 0.85rem; cursor: pointer; transition: all 0.18s; background: var(--surface); }
+.result-card:hover { border-color: var(--blue); box-shadow: var(--shadow); transform: translateY(-1px); }
+.result-card.is-added { border-color: var(--green); background: var(--green-bg); }
+.rc-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.25rem; }
+.rc-name { font-weight: 600; font-size: 0.84rem; color: var(--ink); line-height: 1.3; }
+.rc-price { font-family: 'DM Mono', monospace; font-size: 0.9rem; font-weight: 500; color: var(--ink); white-space: nowrap; flex-shrink: 0; }
+.rc-meta { font-size: 0.7rem; color: var(--ink3); display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
+.state-msg { text-align: center; padding: 1.5rem 0.5rem; color: var(--ink3); font-size: 0.82rem; font-style: italic; }
+
+/* Main */
+.main { padding: 1.75rem 2rem; display: flex; flex-direction: column; gap: 1.5rem; }
+
+/* Value strip */
+.value-strip { background: var(--ink); border-radius: 12px; padding: 1.25rem 1.75rem; display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; box-shadow: var(--shadow-lg); }
+.vs-label { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #666; margin-bottom: 0.15rem; }
+.vs-total { font-family: 'DM Serif Display', serif; font-size: 2.4rem; color: #f0c040; line-height: 1; letter-spacing: -0.02em; transition: transform 0.15s ease; }
+.vs-total.bump { transform: scale(1.05); }
+.vs-stats { display: flex; gap: 2rem; flex-wrap: wrap; }
+.vs-stat { text-align: right; }
+.vs-stat-num { font-family: 'DM Mono', monospace; font-size: 1.3rem; font-weight: 500; color: white; }
+.vs-stat-label { font-size: 0.68rem; color: #666; letter-spacing: 0.1em; text-transform: uppercase; }
+.btn-clear { background: transparent; border: 1px solid #333; color: #666; font-family: 'DM Sans', sans-serif; font-size: 0.78rem; font-weight: 500; padding: 0.45rem 1rem; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+.btn-clear:hover { border-color: var(--red); color: var(--red); }
+.btn-export { background: transparent; border: 1px solid #444; color: #aaa; font-family: 'DM Sans', sans-serif; font-size: 0.78rem; font-weight: 500; padding: 0.45rem 1rem; border-radius: 6px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 0.35rem; }
+.btn-export:hover { border-color: #f0c040; color: #f0c040; }
+.btn-import { background: transparent; border: 1px solid #444; color: #aaa; font-family: 'DM Sans', sans-serif; font-size: 0.78rem; font-weight: 500; padding: 0.45rem 1rem; border-radius: 6px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 0.35rem; }
+.btn-import:hover { border-color: #60a5fa; color: #60a5fa; }
+.vault-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+
+/* Empty vault */
+.vault-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 2rem; text-align: center; color: var(--ink3); border: 2px dashed var(--border); border-radius: 12px; background: var(--surface); }
+.vault-empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.5; }
+.vault-empty p { font-size: 0.9rem; font-style: italic; }
+
+/* Vault items */
+#vaultItems { display: flex; flex-direction: column; gap: 0.6rem; }
+.vault-item { background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; padding: 0.9rem 1.1rem; display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 1rem; animation: fadeUp 0.22s ease; transition: box-shadow 0.2s; }
+.vault-item:hover { box-shadow: var(--shadow); }
+@keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+.vi-name { font-weight: 600; font-size: 0.9rem; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 340px; }
+.vi-meta { font-size: 0.72rem; color: var(--ink3); margin-top: 2px; display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; }
+.vi-meta a { color: var(--ink3); text-decoration: none; }
+.vi-meta a:hover { color: var(--blue); text-decoration: underline; }
+.stepper { display: flex; align-items: center; border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface2); }
+.step-btn { width: 32px; height: 32px; background: transparent; border: none; cursor: pointer; font-size: 1rem; font-weight: 700; color: var(--ink2); display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
+.step-btn:hover { background: var(--border); color: var(--ink); }
+.step-val { min-width: 36px; text-align: center; font-family: 'DM Mono', monospace; font-size: 0.95rem; font-weight: 500; color: var(--ink); border-left: 1px solid var(--border); border-right: 1px solid var(--border); padding: 0 4px; line-height: 32px; }
+.vi-value { text-align: right; min-width: 80px; }
+.vi-line-total { font-family: 'DM Mono', monospace; font-size: 1.1rem; font-weight: 500; color: var(--ink); }
+.vi-unit-price { font-size: 0.7rem; color: var(--ink3); }
+.btn-rm { background: transparent; border: none; color: var(--ink3); cursor: pointer; padding: 5px; border-radius: 5px; display: flex; align-items: center; transition: color 0.2s, background 0.2s; }
+.btn-rm:hover { color: var(--red); background: var(--red-light); }
+
+/* Toast */
+#toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--ink); color: white; padding: 0.75rem 1.25rem; border-radius: 8px; font-size: 0.85rem; font-weight: 500; z-index: 1000; transform: translateY(60px); opacity: 0; transition: all 0.25s ease; max-width: 340px; }
+#toast.show { transform: translateY(0); opacity: 1; }
+#toast.error { background: var(--red); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="header">
+    <div class="header-left">
+      <div class="wordmark">Poké<em>Vault</em></div>
+      <div class="header-tag">ETB &amp; Booster Box Tracker</div>
+    </div>
+    <div class="header-right">
+      <div class="price-tabs">
+        <button class="ptab active" data-mode="market" onclick="setMode('market')">Market</button>
+        <button class="ptab" data-mode="low"    onclick="setMode('low')">Low</button>
+        <button class="ptab" data-mode="high"   onclick="setMode('high')">High</button>
+      </div>
+      <div class="source-badge">
+        <div class="source-dot" id="sourceDot"></div>
+        <span id="sourceLabel">TCGPlayer via TCGCSV</span>
+      </div>
+    </div>
+  </header>
+
+  <aside class="sidebar">
+
+    <!-- Loading / status banner -->
+    <div id="loadingBanner" class="loading-banner">
+      <div class="lb-title">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+        Loading product data…
+      </div>
+      <div class="lb-progress">
+        <div id="loadMsg" style="font-size:0.72rem">Fetching Pokémon sets from TCGCSV…</div>
+        <div class="lb-bar-bg"><div class="lb-bar-fill" id="loadBar" style="width:0%"></div></div>
+      </div>
+    </div>
+    <div id="dataStatus" class="data-status" style="display:none">
+      ✓ <span id="statusText" class="ds-count"></span>
+    </div>
+
+    <!-- Search -->
+    <div>
+      <div class="section-label">Search Products</div>
+      <div class="search-row">
+        <div class="search-box">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          <input id="searchInput" type="text" placeholder="e.g. Twilight Masquerade…" autocomplete="off" disabled>
+        </div>
+        <button class="btn-search" id="searchBtn" onclick="triggerSearch()" disabled>Search</button>
+      </div>
+      <div style="font-size:0.7rem;color:var(--ink3);margin-top:0.4rem;">
+        Press <kbd style="background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:0 3px;font-size:0.9em">Enter</kbd> or click Search. Searches are instant — no API calls.
+      </div>
+    </div>
+
+    <!-- Quick searches -->
+    <div>
+      <div class="section-label">Quick Searches</div>
+      <div class="quick-list" id="quickList">
+        <button class="quick-btn" onclick="quickSearch('Twilight Masquerade')" disabled>Twilight Masquerade <span class="type-pill both">Both</span></button>
+        <button class="quick-btn" onclick="quickSearch('Stellar Crown')" disabled>Stellar Crown <span class="type-pill both">Both</span></button>
+        <button class="quick-btn" onclick="quickSearch('Surging Sparks')" disabled>Surging Sparks <span class="type-pill both">Both</span></button>
+        <button class="quick-btn" onclick="quickSearch('Paradox Rift Elite Trainer')" disabled>Paradox Rift ETB <span class="type-pill etb">ETB</span></button>
+        <button class="quick-btn" onclick="quickSearch('Obsidian Flames booster box')" disabled>Obsidian Flames Box <span class="type-pill box">Box</span></button>
+        <button class="quick-btn" onclick="quickSearch('Crown Zenith Elite Trainer')" disabled>Crown Zenith ETB <span class="type-pill etb">ETB</span></button>
+        <button class="quick-btn" onclick="quickSearch('151 booster box')" disabled>Pokémon 151 Box <span class="type-pill box">Box</span></button>
+        <button class="quick-btn" onclick="quickSearch('Scarlet Violet booster box')" disabled>S&amp;V Base Box <span class="type-pill box">Box</span></button>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div>
+      <div class="section-label">Results</div>
+      <div id="searchResults">
+        <p class="state-msg">Waiting for data to load…</p>
+      </div>
+    </div>
+
+  </aside>
+
+  <main class="main">
+    <div class="value-strip">
+      <div>
+        <div class="vs-label">Collection Value</div>
+        <div class="vs-total" id="totalValue">$0.00</div>
+      </div>
+      <div class="vs-stats">
+        <div class="vs-stat"><div class="vs-stat-num" id="statItems">0</div><div class="vs-stat-label">Products</div></div>
+        <div class="vs-stat"><div class="vs-stat-num" id="statUnits">0</div><div class="vs-stat-label">Units</div></div>
+        <div class="vs-stat"><div class="vs-stat-num" id="statETBs">0</div><div class="vs-stat-label">ETBs</div></div>
+        <div class="vs-stat"><div class="vs-stat-num" id="statBoxes">0</div><div class="vs-stat-label">Booster Boxes</div></div>
+      </div>
+      <div class="vault-actions">
+        <button class="btn-export" onclick="exportVault()" title="Download vault as JSON">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export
+        </button>
+        <label class="btn-import" title="Load vault from JSON file">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Import
+          <input type="file" accept=".json" onchange="importVault(event)" style="display:none">
+        </label>
+        <button class="btn-clear" onclick="clearVault()">Clear All</button>
+      </div>
+    </div>
+
+    <div id="vaultEmpty" class="vault-empty">
+      <div class="vault-empty-icon">📦</div>
+      <p>Your vault is empty — search for ETBs and Booster Boxes to add them.</p>
+    </div>
+    <div id="vaultItems"></div>
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+const vault = new Map();
+let priceMode = 'market';
+let dataReady = false;
+
+// ── Startup: poll /api/status until data is loaded ────────────────────────────
+async function pollStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const s = await r.json();
+
+    if (s.load_error) {
+      document.getElementById('loadingBanner').innerHTML =
+        `<div style="color:var(--red);font-weight:600">⚠ Load error: ${escHtml(s.load_error)}<br><small>Refresh the page to retry.</small></div>`;
+      return;
+    }
+
+    if (s.loading || s.products_ready === 0) {
+      const pct = s.groups_total ? Math.round((s.groups_loaded / s.groups_total) * 100) : 5;
+      document.getElementById('loadBar').style.width = pct + '%';
+      document.getElementById('loadMsg').textContent =
+        s.groups_total
+          ? `${s.groups_loaded} / ${s.groups_total} sets loaded…`
+          : 'Fetching Pokémon set list…';
+      setTimeout(pollStatus, 1200);
+      return;
+    }
+
+    // Data ready!
+    dataReady = true;
+    document.getElementById('loadingBanner').style.display = 'none';
+    const statusEl = document.getElementById('dataStatus');
+    statusEl.style.display = 'flex';
+    document.getElementById('statusText').textContent =
+      `${s.products_ready.toLocaleString()} ETBs & Booster Boxes ready · TCGPlayer prices · refreshes daily`;
+
+    // Enable UI
+    document.getElementById('searchInput').disabled = false;
+    document.getElementById('searchBtn').disabled   = false;
+    document.getElementById('quickList').querySelectorAll('button').forEach(b => b.disabled = false);
+    document.getElementById('searchResults').innerHTML =
+      '<p class="state-msg">Type a set name and press Search.</p>';
+
+    // Update header dot
+    document.getElementById('sourceDot').classList.remove('loading-dot');
+
+  } catch(e) {
+    setTimeout(pollStatus, 2000);
+  }
+}
+
+pollStatus();
+document.getElementById('sourceDot').classList.add('loading-dot');
+
+// ── Price mode ─────────────────────────────────────────────────────────────────
+function setMode(mode) {
+  priceMode = mode;
+  document.querySelectorAll('.ptab').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  renderVault(); recalc();
+}
+function getPrice(item) {
+  if (priceMode === 'low')  return item.price_low  ?? item.price_market ?? null;
+  if (priceMode === 'high') return item.price_high ?? item.price_market ?? null;
+  return item.price_market ?? item.price_low ?? null;
+}
+
+// ── Search ─────────────────────────────────────────────────────────────────────
+document.getElementById('searchInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') triggerSearch();
+});
+
+function triggerSearch() {
+  const q = document.getElementById('searchInput').value.trim();
+  if (!dataReady || q.length < 2) return;
+  doSearch(q);
+}
+
+function quickSearch(q) {
+  document.getElementById('searchInput').value = q;
+  doSearch(q);
+}
+
+function doSearch(q) {
+  if (!dataReady) return;
+  fetch('/api/search?q=' + encodeURIComponent(q))
+    .then(r => r.json())
+    .then(renderResults)
+    .catch(() => {
+      document.getElementById('searchResults').innerHTML =
+        '<p class="state-msg" style="color:var(--red)">Search error — try again.</p>';
+    });
+}
+
+function renderResults(data) {
+  const el = document.getElementById('searchResults');
+  if (data.loading) {
+    el.innerHTML = '<p class="state-msg">Still loading data, please wait…</p>';
+    return;
+  }
+  if (!data.results || !data.results.length) {
+    el.innerHTML = '<p class="state-msg">No ETBs or Booster Boxes found. Try a different search term.</p>';
+    return;
+  }
+  el.innerHTML = data.results.map(r => {
+    const price  = getPrice(r);
+    const added  = vault.has(r.id);
+    const tCls   = r.product_type === 'etb' ? 'etb' : 'box';
+    const tLabel = r.product_type === 'etb' ? 'ETB' : 'Booster Box';
+    const range  = (r.price_low && r.price_high) ? ` · $${r.price_low}–$${r.price_high}` : '';
+    return `<div class="result-card ${added ? 'is-added' : ''}" onclick='addItem(${JSON.stringify(r)})'>
+      <div class="rc-top">
+        <div class="rc-name">${escHtml(r.name)}</div>
+        <div class="rc-price">${price != null ? '$'+price.toFixed(2) : 'N/A'}</div>
+      </div>
+      <div class="rc-meta">
+        <span class="type-pill ${tCls}">${tLabel}</span>
+        ${r.set_name ? `<span>${escHtml(r.set_name)}</span>` : ''}
+        <span>TCGPlayer${range}</span>
+        ${added ? '<span style="color:var(--green);font-weight:600">✓ Added</span>' : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Vault ──────────────────────────────────────────────────────────────────────
+function addItem(item) {
+  if (vault.has(item.id)) {
+    vault.get(item.id).qty++;
+    showToast(`Now ${vault.get(item.id).qty}× in vault`);
+  } else {
+    vault.set(item.id, { ...item, qty: 1 });
+    showToast('Added to vault');
+  }
+  renderVault(); recalc(); save();
+  document.querySelectorAll('.result-card').forEach(el => {
+    const nameEl = el.querySelector('.rc-name');
+    if (nameEl && nameEl.textContent === item.name) {
+      el.classList.add('is-added');
+      const meta = el.querySelector('.rc-meta');
+      if (meta && !meta.querySelector('.added-mark'))
+        meta.insertAdjacentHTML('beforeend', '<span class="added-mark" style="color:var(--green);font-weight:600">✓ Added</span>');
+    }
+  });
+}
+
+function changeQty(id, delta) {
+  if (!vault.has(id)) return;
+  const item = vault.get(id);
+  item.qty = Math.max(0, item.qty + delta);
+  if (item.qty === 0) vault.delete(id);
+  renderVault(); recalc(); save();
+}
+function removeItem(id) { vault.delete(id); renderVault(); recalc(); save(); }
+function clearVault() {
+  if (!vault.size || !confirm('Clear all items?')) return;
+  vault.clear(); renderVault(); recalc(); save();
+}
+
+function renderVault() {
+  const emptyEl = document.getElementById('vaultEmpty');
+  const itemsEl = document.getElementById('vaultItems');
+  if (!vault.size) { emptyEl.style.display = ''; itemsEl.innerHTML = ''; return; }
+  emptyEl.style.display = 'none';
+  const modeLabel = { market:'Market', low:'Low', high:'High' }[priceMode];
+  itemsEl.innerHTML = [...vault.values()].map(item => {
+    const price     = getPrice(item);
+    const lineTotal = price != null ? price * item.qty : null;
+    const tCls      = item.product_type === 'etb' ? 'etb' : 'box';
+    const tLabel    = item.product_type === 'etb' ? 'ETB' : 'Booster Box';
+    return `<div class="vault-item">
+      <div>
+        <div class="vi-name">${escHtml(item.name)}</div>
+        <div class="vi-meta">
+          <span class="type-pill ${tCls}">${tLabel}</span>
+          ${item.set_name ? `<span>${escHtml(item.set_name)}</span>` : ''}
+          ${price != null ? `<span>$${price.toFixed(2)} ea · ${modeLabel}</span>` : '<span>Price N/A</span>'}
+          ${item.url ? `<span><a href="${escHtml(item.url)}" target="_blank" rel="noopener">TCGPlayer ↗</a></span>` : ''}
+        </div>
+      </div>
+      <div class="stepper">
+        <button class="step-btn" onclick="changeQty('${escHtml(item.id)}', -1)">−</button>
+        <div class="step-val">${item.qty}</div>
+        <button class="step-btn" onclick="changeQty('${escHtml(item.id)}', 1)">+</button>
+      </div>
+      <div class="vi-value">
+        <div class="vi-line-total">${lineTotal != null ? '$'+lineTotal.toFixed(2) : '—'}</div>
+        <div class="vi-unit-price">${item.qty} unit${item.qty !== 1 ? 's' : ''}</div>
+      </div>
+      <button class="btn-rm" onclick="removeItem('${escHtml(item.id)}')" title="Remove">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function recalc() {
+  let total=0, units=0, etbs=0, boxes=0;
+  vault.forEach(item => {
+    const p = getPrice(item);
+    if (p != null) total += p * item.qty;
+    units += item.qty;
+    if (item.product_type === 'etb') etbs += item.qty;
+    if (item.product_type === 'booster_box') boxes += item.qty;
+  });
+  const el = document.getElementById('totalValue');
+  el.textContent = '$' + total.toFixed(2);
+  el.classList.add('bump'); setTimeout(() => el.classList.remove('bump'), 200);
+  document.getElementById('statItems').textContent  = vault.size;
+  document.getElementById('statUnits').textContent  = units;
+  document.getElementById('statETBs').textContent   = etbs;
+  document.getElementById('statBoxes').textContent  = boxes;
+}
+
+// ── Persistence ───────────────────────────────────────────────────────────────
+function save() {
+  try { localStorage.setItem('pokevault_v4', JSON.stringify([...vault.entries()])); } catch(e) {}
+}
+function load() {
+  try {
+    const raw = localStorage.getItem('pokevault_v4');
+    if (!raw) return;
+    JSON.parse(raw).forEach(([id, item]) => vault.set(id, item));
+    renderVault(); recalc();
+  } catch(e) {}
+}
+
+// ── Export / Import ───────────────────────────────────────────────────────────
+function exportVault() {
+  if (!vault.size) { showToast('Your vault is empty — nothing to export.'); return; }
+  const data = {
+    exported: new Date().toISOString(),
+    version: 4,
+    items: [...vault.values()],
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `pokevault-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`Exported ${vault.size} product${vault.size !== 1 ? 's' : ''} to JSON`);
+}
+
+function importVault(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      // Support both raw array and wrapped { items: [] } format
+      const items = Array.isArray(data) ? data : (data.items || []);
+      if (!items.length) { showToast('No items found in file.', 'error'); return; }
+      let added = 0, updated = 0;
+      items.forEach(item => {
+        if (!item.id || !item.name) return;
+        if (vault.has(item.id)) {
+          vault.get(item.id).qty = item.qty || 1;
+          updated++;
+        } else {
+          vault.set(item.id, { ...item, qty: item.qty || 1 });
+          added++;
+        }
+      });
+      renderVault(); recalc(); save();
+      showToast(`Imported ${added} new, updated ${updated} existing`);
+    } catch(err) {
+      showToast('Invalid JSON file — could not import.', 'error');
+    }
+    // Reset file input so same file can be re-imported if needed
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (type ? ' '+type : '');
+  clearTimeout(t._t); t._t = setTimeout(() => t.className = '', 2800);
+}
+
+load();
+</script>
+</body>
+</html>
